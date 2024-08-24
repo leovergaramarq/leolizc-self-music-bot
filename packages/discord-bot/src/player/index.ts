@@ -6,6 +6,7 @@ import { pauseCommand } from './commands/pause';
 import { playCommand } from './commands/play';
 import { playlistCommand } from './commands/playlist';
 import { queueCommand } from './commands/queue';
+import { removeCommand } from './commands/remove';
 import { resumeCommand } from './commands/resume';
 import { shuffleCommand } from './commands/shuffle';
 
@@ -18,5 +19,6 @@ export const playerModule = new Module('reproductor', [
   shuffleCommand,
   pauseCommand,
   resumeCommand,
+  removeCommand,
   queueCommand,
 ]);

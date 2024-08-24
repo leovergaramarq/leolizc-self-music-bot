@@ -6,20 +6,13 @@ import {
 } from 'discord.js';
 
 const builder = new SlashCommandBuilder()
-  .setName('move')
-  .setDescription('Mueve una canción de la cola');
+  .setName('remove')
+  .setDescription('Elimina una canción');
 
 builder.addNumberOption((option) =>
   option
-    .setName('de')
+    .setName('posicion')
     .setDescription('Posición actual de la canción')
-    .setRequired(true),
-);
-
-builder.addNumberOption((option) =>
-  option
-    .setName('a')
-    .setDescription('Posición nueva de la canción')
     .setRequired(true),
 );
 
@@ -38,30 +31,23 @@ builder.setAction(async (interaction) => {
     return;
   }
 
-  if (playlist.songs.length < 2) {
-    await interaction.reply('Debe haber al menos dos canciones en la cola');
+  if (playlist.songs.length < 1) {
+    await interaction.reply('Debe haber al menos una canción en la cola');
     return;
   }
 
   const resolver = interaction.options as CommandInteractionOptionResolver;
-  const from = resolver.getNumber('de')! - 1;
-  const to = resolver.getNumber('a')! - 1;
+  const index = resolver.getNumber('posicion')! - 1;
 
-  if (
-    from < 0 ||
-    to < 0 ||
-    from === to ||
-    from >= playlist.songs.length ||
-    to >= playlist.songs.length
-  ) {
-    await interaction.reply('Parámetros inválidos');
+  if (index < 0 || index >= playlist.songs.length) {
+    await interaction.reply('Posición inválida');
     return;
   }
 
-  const song = playlist.songs[from];
+  const song = playlist.songs[index];
 
-  playlist.moveSong(from, to);
-  await interaction.reply(`Rola \`${song.title}\` movida a posición ${to + 1}`);
+  playlist.removeSong(index);
+  await interaction.reply(`Rola \`${song.title}\` eliminada de la cola`);
 });
 
-export const moveCommand = builder;
+export const removeCommand = builder;

@@ -47,7 +47,7 @@ export class YoutubeService implements YTService {
       url: playlist.url,
       videos: playlist.items.map((video) => {
         return {
-          duration: video.duration,
+          duration: Number(video.duration),
           id: video.id,
           title: video.title,
           // Video has bad typing
@@ -60,7 +60,7 @@ export class YoutubeService implements YTService {
   async getVideo(videoUrl: string): Promise<Video> {
     const info = await ytdl.getBasicInfo(videoUrl);
     return {
-      duration: info.videoDetails.lengthSeconds,
+      duration: Number(info.videoDetails.lengthSeconds),
       id: info.videoDetails.videoId,
       title: info.videoDetails.title,
       url: info.videoDetails.video_url,

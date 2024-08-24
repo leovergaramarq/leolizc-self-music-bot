@@ -63,4 +63,4 @@ builder.setAction(async (interaction) => {
   await interaction.reply(`Rola \`${song.title}\` movida a posición ${to}`);
 });
 
-export const nextCommand = builder;
+export const moveCommand = builder;

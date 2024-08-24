@@ -1,5 +1,6 @@
 import { Module } from '../core';
 import { disconnectCommand } from './commands/disconnect';
+import { moveCommand } from './commands/move';
 import { nextCommand } from './commands/next';
 import { pauseCommand } from './commands/pause';
 import { playCommand } from './commands/play';
@@ -11,6 +12,7 @@ import { shuffleCommand } from './commands/shuffle';
 export const playerModule = new Module('reproductor', [
   playCommand,
   disconnectCommand,
+  moveCommand,
   nextCommand,
   playlistCommand,
   shuffleCommand,

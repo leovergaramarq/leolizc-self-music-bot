@@ -13,9 +13,7 @@ export default {
 
     for (const song of queue) {
       if (song.duration) {
-        const [minutes, seconds] = song.duration.split(':');
-        totalDuration +=
-          Number.parseInt(minutes, 10) * 60 + Number.parseInt(seconds, 10);
+        totalDuration += song.duration;
       }
     }
 

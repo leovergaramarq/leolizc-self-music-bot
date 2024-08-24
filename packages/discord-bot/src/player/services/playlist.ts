@@ -14,7 +14,7 @@ interface Embed {
 }
 
 interface Song {
-  duration: string | null;
+  duration: number | null;
   embed: Embed;
   id: string;
   title: string;

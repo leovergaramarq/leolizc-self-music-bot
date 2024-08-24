@@ -14,7 +14,7 @@ export class Video implements IVideo {
     this.url = video.url;
   }
 
-  duration: string | null;
+  duration: number | null;
   id: string;
   title: string;
   url: string;

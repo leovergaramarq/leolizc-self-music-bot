@@ -1,7 +1,7 @@
 import { type Readable } from 'stream';
 
 export interface Video {
-  duration: string | null;
+  duration: number | null;
   id: string;
   thumbnailUrl?: string;
   title: string;

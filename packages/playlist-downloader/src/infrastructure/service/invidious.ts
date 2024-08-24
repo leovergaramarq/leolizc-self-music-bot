@@ -186,7 +186,7 @@ export class InvidiousService implements YTService {
   async getVideo(videoUrl: string): Promise<Video> {
     const info = await ytdl.getBasicInfo(videoUrl);
     return {
-      duration: info.videoDetails.lengthSeconds,
+      duration: Number(info.videoDetails.lengthSeconds),
       id: info.videoDetails.videoId,
       thumbnailUrl: info.videoDetails.thumbnails[0].url,
       title: info.videoDetails.title,

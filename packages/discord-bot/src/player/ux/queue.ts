@@ -49,7 +49,7 @@ export default {
       })
       .join('\n');
 
-    const description = `**${queue.length} canciones en espera**\n(${time})\n${songsString}`;
+    const description = `**${queue.length} canciones en espera**\n(${time})\n\n${songsString}`;
 
     return new EmbedBuilder()
       .setColor(0xfa_a6_1a)

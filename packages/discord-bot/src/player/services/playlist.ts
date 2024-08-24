@@ -176,4 +176,11 @@ export class PlaylistManager {
     const [songFrom] = this.songs.splice(from, 1);
     this.songs.splice(to, 0, songFrom);
   }
+
+  async clear() {
+    this.songs = [];
+    if (this.player.state.status !== AudioPlayerStatus.Idle) {
+      this.player.stop();
+    }
+  }
 }

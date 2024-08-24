@@ -1,11 +1,21 @@
 import { SlashCommandBuilder } from '../../core';
 import { playlistAdministrator as pa } from '../services/administrator';
 import queueEmbedBuilder from '../ux/queue';
-import { type GuildMember } from 'discord.js';
+import {
+  type CommandInteractionOptionResolver,
+  type GuildMember,
+} from 'discord.js';
 
 const builder = new SlashCommandBuilder()
   .setName('queue')
   .setDescription('Muestra la lista de canciones en cola');
+
+builder.addIntegerOption((option) =>
+  option
+    .setName('page')
+    .setDescription('Página de la lista de reproducción')
+    .setRequired(false),
+);
 
 builder.setAction(async (interaction) => {
   const channel = (interaction.member as GuildMember)?.voice.channel;
@@ -23,8 +33,11 @@ builder.setAction(async (interaction) => {
   }
 
   const queue = playlist.songs;
+  const resolver = interaction.options as CommandInteractionOptionResolver;
 
-  const embedInfo = queueEmbedBuilder.build({ queue });
+  const page = resolver.getInteger('page') ?? 0;
+
+  const embedInfo = queueEmbedBuilder.build({ page, queue });
   await interaction.reply({ embeds: [embedInfo] });
 });
 

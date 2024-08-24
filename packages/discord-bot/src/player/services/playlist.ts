@@ -171,4 +171,9 @@ export class PlaylistManager {
     this.songs.splice(index, 1);
     await this.checkAndPlay();
   }
+
+  async moveSong(from: number, to: number) {
+    const [songFrom] = this.songs.splice(from, 1);
+    this.songs.splice(to, 0, songFrom);
+  }
 }

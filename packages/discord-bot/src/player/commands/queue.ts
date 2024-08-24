@@ -35,7 +35,7 @@ builder.setAction(async (interaction) => {
   const queue = playlist.songs;
   const resolver = interaction.options as CommandInteractionOptionResolver;
 
-  const page = resolver.getInteger('page') ?? 0;
+  const page = (resolver.getInteger('page') ?? 1) - 1;
 
   const embedInfo = queueEmbedBuilder.build({ page, queue });
   await interaction.reply({ embeds: [embedInfo] });

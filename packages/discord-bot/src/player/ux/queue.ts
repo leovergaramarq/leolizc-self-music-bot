@@ -38,7 +38,7 @@ export default {
       .slice(11, 19);
 
     const songsString = queue
-      .slice(page * 10, page * 10)
+      .slice(page * 10, (page + 1) * 10)
       .map(
         (song, index) =>
           `\`${index + 1}.\` **[${song.title}](${song.url})**\n(${song.duration || 'Desconocido'})`,

@@ -38,7 +38,12 @@ export const DiscFactory = {
         await interaction.reply({ content: 'Command executed!', ephemeral: true });
       } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        const response = { content: 'There was an error while executing this command!', ephemeral: true };
+        if (interaction.replied) {
+          await interaction.followUp(response);
+        } else {
+          await interaction.reply(response);
+        }
       }
     });
   },

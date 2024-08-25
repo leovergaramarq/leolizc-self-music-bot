@@ -71,6 +71,9 @@ export class InvidiousService implements YTService {
 
   async getPlaylist(url: string, _?: PlaylistOptions): Promise<Playlist> {
     const playlistId = this.getPlaylistIdFromUrl(url);
+    if (!playlistId) {
+      throw new Error('Invalid URL');
+    }
 
     const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
     let errorApiVideo;
@@ -121,6 +124,10 @@ export class InvidiousService implements YTService {
 
   async getVideo(videoUrl: string): Promise<Video> {
     const videoId = this.getVideoIdFromUrl(videoUrl);
+    if (!videoId) {
+      throw new Error('Invalid URL');
+    }
+
     let responseApi;
     const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
     let errorApi;

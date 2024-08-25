@@ -83,7 +83,7 @@ export class PlaylistManager {
   async addSong({ embed, url, insertFirst }: AddSongParameters) {
     const video = await pldl.service.getVideo(url);
 
-    if (video.title === '[Deleted video]') {
+    if (!this.isVideoAvailable(video.title)) {
       throw new Error("Video unavailable");
     }
 
@@ -103,7 +103,7 @@ export class PlaylistManager {
     const playlist = await pldl(url);
 
     for (const video of playlist.videos) {
-      if (video.title === '[Deleted video]') continue;
+      if (!this.isVideoAvailable(video.title)) continue;
       this.songs.push({
         ...video,
         embed,
@@ -182,5 +182,9 @@ export class PlaylistManager {
     if (this.player.state.status !== AudioPlayerStatus.Idle) {
       this.player.stop();
     }
+  }
+
+  private isVideoAvailable(title: string) {
+    return !["[Deleted video]", "[Private video]"].includes(title);
   }
 }

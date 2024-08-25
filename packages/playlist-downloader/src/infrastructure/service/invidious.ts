@@ -57,6 +57,11 @@ export class InvidiousService implements YTService {
         });
 
         videoInfo = await responseApiVideo.json();
+
+        if (videoInfo['error']) {
+          throw new Error('Video unavailable');
+        }
+
         errorApiVideo = undefined;
         break;
       } catch (error) {

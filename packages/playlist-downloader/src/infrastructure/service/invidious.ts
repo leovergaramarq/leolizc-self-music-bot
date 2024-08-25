@@ -1,5 +1,6 @@
 // eslint-disable-next-line simple-import-sort/imports
 import { parse } from 'node-html-parser';
+import { URL } from 'url';
 import { type StreamMedia, type Video } from '../../core/entities/media';
 import {
   type VideoOptions,
@@ -8,10 +9,10 @@ import {
 import { type Playlist } from '../../core/entities/playlist';
 import { type YoutubeService as YTService } from '../../core/services/youtube';
 
-import ytpl from '@distube/ytpl';
-import ytdl from '@distube/ytdl-core';
 import { type Readable } from 'stream';
 import { fetchWithTimeout } from '../../utils/fetch';
+import ytpl from '@distube/ytpl';
+import ytdl from '@distube/ytdl-core';
 
 export class InvidiousService implements YTService {
   private readonly baseUrls: string[] = [
@@ -40,26 +41,52 @@ export class InvidiousService implements YTService {
     this.apiBaseUrlIndex = (this.apiBaseUrlIndex + 1) % this.baseUrls.length;
   }
 
-  async downloadVideoUrl(url: string, _?: VideoOptions): Promise<StreamMedia> {
-    const videoId: string = ytdl.getVideoID(url);
+  async downloadVideoUrl(
+    videoUrl: string,
+    _?: VideoOptions,
+  ): Promise<StreamMedia> {
+    const video = await this.getVideo(videoUrl);
+    const stream = await this.getVideoStream(videoUrl);
 
-    let responseApiVideo;
+    return {
+      id: video.id,
+      stream,
+      thumbnailUrl: video.thumbnailUrl,
+      title: video.title,
+      url: videoUrl,
+    };
+  }
+
+  async downloadVideo(video: Video): Promise<StreamMedia> {
+    const stream = await this.getVideoStream(video.url);
+
+    return {
+      id: video.id,
+      stream,
+      thumbnailUrl: video.thumbnailUrl,
+      title: video.title,
+      url: video.url,
+    };
+  }
+
+  async getPlaylist(url: string, _?: PlaylistOptions): Promise<Playlist> {
+    const playlistId = this.getPlaylistIdFromUrl(url);
+
     const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
     let errorApiVideo;
-    let videoInfo;
+    let playlist;
 
     for (let index = 0; index < numberAttemptsApi; index++) {
       try {
-        const urlFetch = `${this.apiBaseUrl}/videos/${videoId}`;
-        console.log('Fetching API URL', urlFetch);
-        responseApiVideo = await fetchWithTimeout(urlFetch, {
+        const urlFetch = `${this.apiBaseUrl}/playlists/${playlistId}`;
+        console.log(`Getting playlist ${urlFetch}`);
+        const response = await fetchWithTimeout(urlFetch, {
           timeout: 3_000,
         });
+        playlist = await response.json();
 
-        videoInfo = await responseApiVideo.json();
-
-        if (videoInfo['error']) {
-          throw new Error('Video unavailable');
+        if (playlist['error']) {
+          throw new Error('Playlist unavailable');
         }
 
         errorApiVideo = undefined;
@@ -70,20 +97,118 @@ export class InvidiousService implements YTService {
       }
     }
 
-    if (errorApiVideo || !responseApiVideo) {
+    if (errorApiVideo || !playlist) {
       throw errorApiVideo;
     }
 
-    const numberAttemptsHtml = this.baseUrls.length; // max times to make the request - at least 1
+    return {
+      id: playlist['playlistId'],
+      title: playlist['title'],
+      url,
+      videos: playlist['videos']
+        .filter((videoInfo: Record<string, unknown>) =>
+          this.isVideoAvailable(videoInfo),
+        )
+        .map((videoInfo: Record<string, unknown>) => ({
+          duration: videoInfo['lengthSeconds'],
+          id: videoInfo['videoId'],
+          thumbnailUrl: this.findThumbnail(videoInfo),
+          title: videoInfo['title'],
+          url: `https://www.youtube.com/watch?v=${videoInfo['videoId']}`,
+        })),
+    };
+  }
+
+  async getVideo(videoUrl: string): Promise<Video> {
+    const videoId = this.getVideoIdFromUrl(videoUrl);
+    let responseApi;
+    const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
+    let errorApi;
+    let videoInfo;
+
+    for (let index = 0; index < numberAttemptsApi; index++) {
+      try {
+        const urlFetch = `${this.apiBaseUrl}/videos/${videoId}`;
+        console.log('Fetching API URL', urlFetch);
+        responseApi = await fetchWithTimeout(urlFetch, {
+          timeout: 3_000,
+        });
+
+        videoInfo = await responseApi.json();
+
+        if (!this.isVideoAvailable(videoInfo)) {
+          throw new Error('Video unavailable');
+        }
+
+        errorApi = undefined;
+        break;
+      } catch (error) {
+        errorApi = error;
+        this.nextApiBaseUrl();
+      }
+    }
+
+    if (errorApi || !videoInfo) {
+      throw errorApi;
+    }
+
+    return {
+      duration: Number(videoInfo['lengthSeconds']),
+      id: videoInfo['videoId'],
+      thumbnailUrl: this.findThumbnail(videoInfo),
+      title: videoInfo['title'],
+      url: `https://www.youtube.com/watch?v=${videoInfo['videoId']}`,
+    };
+  }
+
+  validatePlaylistUrl(url: string): boolean {
+    return ytpl.validateID(url);
+  }
+
+  validateVideoUrl(url: string): boolean {
+    return ytdl.validateURL(url);
+  }
+
+  private findThumbnail(videoInfo: Record<string, unknown>) {
+    const thumbnails = videoInfo.videoThumbnails as Array<
+      Record<string, unknown>
+    >;
+    let index = thumbnails.findIndex(
+      (vidThumb: Record<string, unknown>) => vidThumb.quality === 'medium',
+    );
+    if (index === -1) index = 0;
+    return String(thumbnails[index].url);
+  }
+
+  private getVideoIdFromUrl(url: string) {
+    return new URL(url).searchParams.get('v');
+  }
+
+  private getPlaylistIdFromUrl(url: string) {
+    return new URL(url).searchParams.get('list');
+  }
+
+  private isVideoAvailable(videoInfo: Record<string, unknown>) {
+    return (
+      !videoInfo['error'] &&
+      !['[Deleted video]', '[Private video]'].includes(
+        videoInfo['title'] as string,
+      )
+    );
+  }
+
+  private async getVideoStream(videoUrl: string): Promise<Readable> {
+    const videoId = this.getVideoIdFromUrl(videoUrl);
+    const numberAttempts = this.baseUrls.length; // max times to make the request - at least 1
     let errorHtml;
     let stream;
 
-    for (let index = 0; index < numberAttemptsHtml; index++) {
+    for (let index = 0; index < numberAttempts; index++) {
       try {
         const videoUrlInvidious = `${this.baseUrl}/watch?v=${videoId}`;
         console.log(`Fetching HTML ${videoUrlInvidious}`);
 
-        const responseHtml = await fetchWithTimeout(`${videoUrlInvidious}`, {
+        const responseHtml = await fetchWithTimeout(videoUrlInvidious, {
           timeout: 8_000,
         });
         const html = (await responseHtml!.text()).trim();
@@ -107,7 +232,14 @@ export class InvidiousService implements YTService {
         }
 
         const downloadUrl = `${this.baseUrl}${endpointVideoResource}`;
-        stream = await this.fetchStream(downloadUrl);
+        console.log('Download URL', downloadUrl);
+        const response = await fetch(downloadUrl);
+
+        if (!response.ok) {
+          throw new Error(`Error en la descarga: ${response.statusText}`);
+        }
+
+        stream = response.body as unknown as Readable;
 
         errorHtml = undefined;
         break;
@@ -117,116 +249,10 @@ export class InvidiousService implements YTService {
       }
     }
 
-    if (errorHtml) {
+    if (errorHtml || !stream) {
       throw errorHtml;
     }
 
-    return {
-      id: videoInfo.videoId,
-      stream: stream!,
-      thumbnailUrl: this.findThumbnail(videoInfo),
-      title: videoInfo.title,
-      url,
-    };
-  }
-
-  async downloadVideo(video: Video): Promise<StreamMedia> {
-    const stream = await this.fetchStream(video.url);
-
-    return {
-      id: video.id,
-      stream,
-      thumbnailUrl: video.thumbnailUrl,
-      title: video.title,
-      url: video.url,
-    };
-  }
-
-  async getPlaylist(url: string, _?: PlaylistOptions): Promise<Playlist> {
-    const playlistId: string = await ytpl.getPlaylistID(url);
-
-    const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
-    let errorApiVideo;
-    let playlist;
-
-    for (let index = 0; index < numberAttemptsApi; index++) {
-      try {
-        const urlFetch = `${this.apiBaseUrl}/playlists/${playlistId}`;
-        console.log(`Getting playlist ${urlFetch}`);
-        const response = await fetchWithTimeout(urlFetch, {
-          timeout: 3_000,
-        });
-        playlist = await response.json();
-
-        errorApiVideo = undefined;
-        break;
-      } catch (error) {
-        errorApiVideo = error;
-        this.nextApiBaseUrl();
-      }
-    }
-
-    if (errorApiVideo || !playlist) {
-      throw errorApiVideo;
-    }
-
-    if (playlist['error']) {
-      throw new Error('Playlist unavailable');
-    }
-
-    return {
-      id: playlist.playlistId,
-      title: playlist.title,
-      url,
-      videos: playlist.videos.map((video: Record<string, unknown>) => ({
-        duration: video.lengthSeconds,
-        id: video.videoId,
-        thumbnailUrl: this.findThumbnail(video),
-        title: video.title,
-        url: `https://www.youtube.com/watch?v=${video.videoId}`,
-      })),
-    };
-  }
-
-  async getVideo(videoUrl: string): Promise<Video> {
-    const info = await ytdl.getBasicInfo(videoUrl);
-    return {
-      duration: Number(info.videoDetails.lengthSeconds),
-      id: info.videoDetails.videoId,
-      thumbnailUrl: info.videoDetails.thumbnails[0].url,
-      title: info.videoDetails.title,
-      url: info.videoDetails.video_url,
-    };
-  }
-
-  validatePlaylistUrl(url: string): boolean {
-    return ytpl.validateID(url);
-  }
-
-  validateVideoUrl(url: string): boolean {
-    return ytdl.validateURL(url);
-  }
-
-  async fetchStream(url: string): Promise<Readable> {
-    console.log('fetchStream', url);
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Error en la descarga: ${response.statusText}`);
-    }
-
-    const readableStream = response.body as unknown as Readable;
-    return readableStream;
-  }
-
-  private findThumbnail(videoInfo: Record<string, unknown>) {
-    const thumbnails = videoInfo.videoThumbnails as Array<
-      Record<string, unknown>
-    >;
-    let index = thumbnails.findIndex(
-      (vidThumb: Record<string, unknown>) => vidThumb.quality === 'medium',
-    );
-    if (index === -1) index = 0;
-    return String(thumbnails[index].url);
+    return stream;
   }
 }

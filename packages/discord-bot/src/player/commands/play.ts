@@ -40,6 +40,8 @@ builder.setAction(async (interaction) => {
   const isPlayerIdle = playlist.player.state.status === AudioPlayerStatus.Idle;
 
   try {
+    await interaction.deferReply();
+
     const action = isPlayerIdle ? 'Reproduciendo' : 'Añadida';
     const embed = {
       avatarUrl: interaction.user.avatarURL(),
@@ -59,15 +61,15 @@ builder.setAction(async (interaction) => {
       username: embed.username,
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embedInfo],
     });
   } catch (error) {
     console.error(error);
     if (error instanceof Error && error.message === 'Video unavailable') {
-      await interaction.reply('Video no disponible');
+      await interaction.editReply('Video no disponible');
     } else {
-      await interaction.reply('Ocurrió un error');
+      await interaction.editReply('Ocurrió un error');
     }
   }
 });

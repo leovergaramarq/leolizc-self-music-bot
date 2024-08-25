@@ -17,9 +17,9 @@ interface Song {
   duration: number | null;
   embed: Embed;
   id: string;
+  thumbnailUrl?: string;
   title: string;
   url: string;
-  thumbnailUrl?: string;
 }
 
 interface AddSongParameters {
@@ -72,7 +72,7 @@ export class PlaylistManager {
         await this.playNext();
       }
     });
-    
+
     player.on('error', console.error);
   }
 
@@ -82,10 +82,6 @@ export class PlaylistManager {
 
   async addSong({ embed, url, insertFirst }: AddSongParameters) {
     const video = await pldl.service.getVideo(url);
-
-    if (!this.isVideoAvailable(video.title)) {
-      throw new Error("Video unavailable");
-    }
 
     const song = { ...video, embed };
 
@@ -103,13 +99,12 @@ export class PlaylistManager {
     const playlist = await pldl(url);
 
     for (const video of playlist.videos) {
-      if (!this.isVideoAvailable(video.title)) continue;
       this.songs.push({
         ...video,
         embed,
       });
     }
-    
+
     const playlistOriginal = playlist;
     playlistOriginal.videos = Array.from(this.songs);
 
@@ -182,9 +177,5 @@ export class PlaylistManager {
     if (this.player.state.status !== AudioPlayerStatus.Idle) {
       this.player.stop();
     }
-  }
-
-  private isVideoAvailable(title: string) {
-    return !["[Deleted video]", "[Private video]"].includes(title);
   }
 }

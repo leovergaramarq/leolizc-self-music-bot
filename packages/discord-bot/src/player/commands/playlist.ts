@@ -33,6 +33,7 @@ builder.setAction(async (interaction) => {
   const isPlayerIdle = playlist.player.state.status === AudioPlayerStatus.Idle;
 
   try {
+    await interaction.deferReply();
     const embed = {
       avatarUrl: interaction.user.avatarURL(),
       songThumbnail: interaction.user.avatarURL(),
@@ -50,7 +51,7 @@ builder.setAction(async (interaction) => {
       username: embed.username,
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embedInfo],
     });
 
@@ -71,9 +72,9 @@ builder.setAction(async (interaction) => {
   } catch (error) {
     console.error(error instanceof Error && error.message);
     if (error instanceof Error && error.message === 'Playlist unavailable') {
-      await interaction.reply('Playlist no disponible');
+      await interaction.editReply('Playlist no disponible');
     } else {
-      await interaction.reply('Ocurrió un error');
+      await interaction.editReply('Ocurrió un error');
     }
   }
 });

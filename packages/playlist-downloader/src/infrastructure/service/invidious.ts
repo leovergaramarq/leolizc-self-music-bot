@@ -15,30 +15,38 @@ import ytpl from '@distube/ytpl';
 import ytdl from '@distube/ytdl-core';
 
 export class InvidiousService implements YTService {
-  private readonly baseUrls: string[] = [
-    'https://invidious.privacyredirect.com',
-    'https://invidious.jing.rocks',
-    'https://iv.ggtyler.dev',
-    // 'https://inv.tux.pizza',
+  private readonly invidiousHostsUrl =
+    'https://api.invidious.io/instances.json';
+
+  private baseApiUrls: string[] = [
+    'https://inv.nadeko.net',
+    // 'https://invidious.jing.rocks',
+    // 'https://invidious.privacyredirect.com',
   ];
+
+  private baseVideoUrls: string[] = ['https://inv.nadeko.net'];
 
   private baseUrlIndex: number = 0;
   private apiBaseUrlIndex: number = 0;
 
-  private get baseUrl(): string {
-    return this.baseUrls[this.baseUrlIndex];
+  constructor() {
+    this.setBaseUrls().catch(console.error);
   }
 
-  private get apiBaseUrl(): string {
-    return `${this.baseUrls[this.apiBaseUrlIndex]}/api/v1`;
+  private get baseVideoUrl(): string {
+    return this.baseVideoUrls[this.baseUrlIndex];
   }
 
-  private nextBaseUrl() {
-    this.baseUrlIndex = (this.baseUrlIndex + 1) % this.baseUrls.length;
+  private get baseApiUrl(): string {
+    return `${this.baseApiUrls[this.apiBaseUrlIndex]}/api/v1`;
   }
 
-  private nextApiBaseUrl() {
-    this.apiBaseUrlIndex = (this.apiBaseUrlIndex + 1) % this.baseUrls.length;
+  private nextBaseVideoUrl() {
+    this.baseUrlIndex = (this.baseUrlIndex + 1) % this.baseVideoUrls.length;
+  }
+
+  private nextBaseApiUrl() {
+    this.apiBaseUrlIndex = (this.apiBaseUrlIndex + 1) % this.baseApiUrls.length;
   }
 
   async downloadVideoUrl(
@@ -75,13 +83,13 @@ export class InvidiousService implements YTService {
       throw new Error('Invalid URL');
     }
 
-    const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
+    const numberAttemptsApi = this.baseApiUrls.length; // max times to make the request - at least 1
     let errorApiVideo;
     let playlist;
 
     for (let index = 0; index < numberAttemptsApi; index++) {
       try {
-        const urlFetch = `${this.apiBaseUrl}/playlists/${playlistId}`;
+        const urlFetch = `${this.baseApiUrl}/playlists/${playlistId}`;
         console.log(`Getting playlist ${urlFetch}`);
         const response = await fetchWithTimeout(urlFetch, {
           timeout: 3_000,
@@ -96,7 +104,7 @@ export class InvidiousService implements YTService {
         break;
       } catch (error) {
         errorApiVideo = error;
-        this.nextApiBaseUrl();
+        this.nextBaseApiUrl();
       }
     }
 
@@ -129,13 +137,13 @@ export class InvidiousService implements YTService {
     }
 
     let responseApi;
-    const numberAttemptsApi = this.baseUrls.length; // max times to make the request - at least 1
+    const numberAttemptsApi = this.baseApiUrls.length; // max times to make the request - at least 1
     let errorApi;
     let videoInfo;
 
     for (let index = 0; index < numberAttemptsApi; index++) {
       try {
-        const urlFetch = `${this.apiBaseUrl}/videos/${videoId}`;
+        const urlFetch = `${this.baseApiUrl}/videos/${videoId}`;
         console.log('Fetching API URL', urlFetch);
         responseApi = await fetchWithTimeout(urlFetch, {
           timeout: 3_000,
@@ -151,7 +159,7 @@ export class InvidiousService implements YTService {
         break;
       } catch (error) {
         errorApi = error;
-        this.nextApiBaseUrl();
+        this.nextBaseApiUrl();
       }
     }
 
@@ -206,17 +214,17 @@ export class InvidiousService implements YTService {
 
   private async getVideoStream(videoUrl: string): Promise<Readable> {
     const videoId = this.getVideoIdFromUrl(videoUrl);
-    const numberAttempts = this.baseUrls.length; // max times to make the request - at least 1
+    const numberAttempts = this.baseVideoUrls.length; // max times to make the request - at least 1
     let errorHtml;
     let stream;
 
     for (let index = 0; index < numberAttempts; index++) {
       try {
-        const videoUrlInvidious = `${this.baseUrl}/watch?v=${videoId}`;
+        const videoUrlInvidious = `${this.baseVideoUrl}/watch?v=${videoId}`;
         console.log(`Fetching HTML ${videoUrlInvidious}`);
 
         const responseHtml = await fetchWithTimeout(videoUrlInvidious, {
-          timeout: 8_000,
+          timeout: 10_000,
         });
         const html = (await responseHtml!.text()).trim();
 
@@ -238,7 +246,7 @@ export class InvidiousService implements YTService {
           throw new Error('Empty src attribute in </source> element');
         }
 
-        const downloadUrl = `${this.baseUrl}${endpointVideoResource}`;
+        const downloadUrl = `${this.baseVideoUrl}${endpointVideoResource}`;
         console.log('Download URL', downloadUrl);
         const response = await fetch(downloadUrl);
 
@@ -252,7 +260,7 @@ export class InvidiousService implements YTService {
         break;
       } catch (error) {
         errorHtml = error;
-        this.nextBaseUrl();
+        this.nextBaseVideoUrl();
       }
     }
 
@@ -261,5 +269,68 @@ export class InvidiousService implements YTService {
     }
 
     return stream;
+  }
+
+  async setBaseUrls() {
+    try {
+      const response = await fetchWithTimeout(this.invidiousHostsUrl, {
+        timeout: 3_000,
+      });
+      const data = await response.json();
+
+      this.baseApiUrls = data
+        .filter((host: Array<Record<string, unknown>>) => {
+          const info = host[1];
+          const monitor = info['monitor'] as Record<string, unknown>;
+          const stats = info['stats'] as Record<string, unknown>;
+          if (!stats) return false;
+          const statsUsage = stats['usage'] as Record<string, unknown>;
+          const statsUsageUsers = statsUsage['users'] as Record<
+            string,
+            unknown
+          >;
+
+          return (
+            info['api'] &&
+            // info['cors'] &&
+            info['type'] === 'https' &&
+            !monitor['down'] &&
+            monitor['up_since'] &&
+            monitor['enabled'] &&
+            monitor['published'] &&
+            // stats['openRegistrations'] &&
+            (statsUsageUsers['total'] as number) > 1_000
+          );
+        })
+        .map((host: Array<Record<string, unknown>>) => host[1]['uri']);
+
+      this.baseVideoUrls = data
+        .filter((host: Array<Record<string, unknown>>) => {
+          const info = host[1];
+          const monitor = info['monitor'] as Record<string, unknown>;
+          const stats = info['stats'] as Record<string, unknown>;
+          if (!stats) return false;
+          const statsUsage = stats['usage'] as Record<string, unknown>;
+          const statsUsageUsers = statsUsage['users'] as Record<
+            string,
+            unknown
+          >;
+
+          return (
+            // info['api'] &&
+            // info['cors'] &&
+            info['type'] === 'https' &&
+            !monitor['down'] &&
+            monitor['up_since'] &&
+            monitor['enabled'] &&
+            monitor['published'] &&
+            // stats['openRegistrations'] &&
+            (statsUsageUsers['total'] as number) > 1_000
+          );
+        })
+        .map((host: Array<Record<string, unknown>>) => host[1]['uri']);
+    } catch (error) {
+      console.log(error);
+    }
   }
 }
